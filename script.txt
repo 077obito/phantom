@@ -1,65 +1,816 @@
 --[[
 ╔══════════════════════════════════════════════════════════════╗
-║                      PHANTOM HUB v1.0                        ║
-║              Painel de Script Completo para Roblox            ║
-║                     Uso Educacional / Testes                  ║
+║                      PHANTOM HUB v2.0                        ║
+║         Painel Premium Completo - Ícone + Menu Flutuante      ║
 ╚══════════════════════════════════════════════════════════════╝
 --]]
 
--- Carregar biblioteca de UI (suporta Synapse, Krnl, Script-Ware, etc.)
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+-- ============================================================
+-- CONFIGURAÇÕES INICIAIS
+-- ============================================================
+local player = game.Players.LocalPlayer
+local mouse = player:GetMouse()
+local camera = workspace.CurrentCamera
+local userInput = game:GetService("UserInputService")
+local runService = game:GetService("RunService")
+local tweenService = game:GetService("TweenService")
+local players = game:GetService("Players")
+local guiService = game:GetService("GuiService")
 
--- Janela principal
-local Window = Library.CreateLib("PHANTOM HUB | Roblox", "DarkTheme")
+-- Variáveis globais de controle
+local flags = {
+    walkspeed = false,
+    jumppower = false,
+    noclip = false,
+    fly = false,
+    invisivel = false,
+    espPlayers = false,
+    espItens = false,
+    aimbot = false,
+    autoClick = false,
+    clickTP = false,
+    antiafk = false,
+    fullbright = false,
+    fovZoom = false,
+    viewPlayer = false,
+}
+
+local connections = {}
+local flySpeed = 50
 
 -- ============================================================
--- ABA: PLAYER (Jogador)
+-- CRIAÇÃO DA GUI PRINCIPAL
 -- ============================================================
-local PlayerTab = Window:NewTab("Player")
-local PlayerSection = PlayerTab:NewSection("Controles do Jogador")
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "PhantomHub"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- WalkSpeed
-PlayerSection:NewToggle("WalkSpeed", "Aumenta a velocidade de movimento", function(state)
-    if state then
-        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = 50
-    else
-        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = 16
-    end
-end)
+-- Função para criar UI elegante
+local function criaBotaoIcone()
+    local btn = Instance.new("ImageButton")
+    btn.Name = "ToggleBtn"
+    btn.Size = UDim2.new(0, 50, 0, 50)
+    btn.Position = UDim2.new(0, 20, 0, 150)
+    btn.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    btn.BackgroundTransparency = 0.3
+    btn.BorderSizePixel = 2
+    btn.BorderColor3 = Color3.fromRGB(100, 0, 255)
+    btn.Image = ""  -- sem imagem, usaremos texto
+    btn.Draggable = true
+    btn.Active = true
+    btn.Selectable = true
+    
+    local iconeLabel = Instance.new("TextLabel")
+    iconeLabel.Size = UDim2.new(1, 0, 1, 0)
+    iconeLabel.BackgroundTransparency = 1
+    iconeLabel.Text = "P"
+    iconeLabel.TextColor3 = Color3.fromRGB(150, 50, 255)
+    iconeLabel.TextScaled = true
+    iconeLabel.Font = Enum.Font.GothamBold
+    iconeLabel.Parent = btn
+    
+    local uc = Instance.new("UICorner")
+    uc.CornerRadius = UDim.new(0, 12)
+    uc.Parent = btn
+    
+    btn.Parent = screenGui
+    return btn
+end
 
--- JumpPower
-PlayerSection:NewToggle("JumpPower", "Aumenta a altura do pulo", function(state)
-    if state then
-        game.Players.LocalPlayer.Character.Humanoid.JumpPower = 100
-    else
-        game.Players.LocalPlayer.Character.Humanoid.JumpPower = 50
-    end
-end)
+local toggleBtn = criaBotaoIcone()
 
--- Noclip (Atravessar paredes)
-PlayerSection:NewToggle("Noclip", "Atravessa paredes e objetos", function(state)
-    local noclip = state
-    game:GetService("RunService").Stepped:Connect(function()
-        if noclip then
-            game.Players.LocalPlayer.Character.Humanoid:ChangeState(11)
+-- ============================================================
+-- CRIAÇÃO DO MENU PRINCIPAL (com animação)
+-- ============================================================
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainMenu"
+mainFrame.Size = UDim2.new(0, 380, 0, 500)
+mainFrame.Position = UDim2.new(0.5, -190, 0.5, -250)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+mainFrame.BorderSizePixel = 2
+mainFrame.BorderColor3 = Color3.fromRGB(100, 0, 255)
+mainFrame.BackgroundTransparency = 0.05
+mainFrame.ClipsDescendants = true
+mainFrame.Visible = false
+mainFrame.Active = true
+mainFrame.Selectable = true
+mainFrame.Parent = screenGui
+
+-- Arredondar bordas
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 10)
+mainCorner.Parent = mainFrame
+
+-- Sombra
+local shadow = Instance.new("ImageLabel")
+shadow.Size = UDim2.new(1, 10, 1, 10)
+shadow.Position = UDim2.new(0, -5, 0, -5)
+shadow.BackgroundTransparency = 1
+shadow.Image = "rbxassetid://6014261993"
+shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+shadow.ImageTransparency = 0.6
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(20, 20, 280, 280)
+shadow.ZIndex = -1
+shadow.Parent = mainFrame
+
+-- Barra superior
+local topBar = Instance.new("Frame")
+topBar.Size = UDim2.new(1, 0, 0, 40)
+topBar.BackgroundColor3 = Color3.fromRGB(25, 20, 45)
+topBar.BorderSizePixel = 0
+topBar.Parent = mainFrame
+
+local topCorner = Instance.new("UICorner")
+topCorner.CornerRadius = UDim.new(0, 10)
+topCorner.Parent = topBar
+
+local topBarInner = Instance.new("Frame")
+topBarInner.Size = UDim2.new(1, 0, 0, 20)
+topBarInner.Position = UDim2.new(0, 0, 0, 20)
+topBarInner.BackgroundColor3 = Color3.fromRGB(25, 20, 45)
+topBarInner.BorderSizePixel = 0
+topBarInner.Parent = topBar
+
+-- Título
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -40, 1, 0)
+titleLabel.Position = UDim2.new(0, 10, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "PHANTOM HUB"
+titleLabel.TextColor3 = Color3.fromRGB(150, 50, 255)
+titleLabel.TextScaled = false
+titleLabel.TextSize = 20
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = topBar
+
+-- Botão fechar
+local closeBtn = Instance.new("ImageButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.BackgroundTransparency = 1
+closeBtn.Image = "rbxassetid://6031094662"
+closeBtn.ImageColor3 = Color3.fromRGB(255, 80, 80)
+closeBtn.Parent = topBar
+
+-- ============================================================
+-- CRIAÇÃO DAS ABAS (TABS)
+-- ============================================================
+local tabContainer = Instance.new("Frame")
+tabContainer.Size = UDim2.new(1, 0, 0, 35)
+tabContainer.Position = UDim2.new(0, 0, 0, 40)
+tabContainer.BackgroundColor3 = Color3.fromRGB(20, 18, 35)
+tabContainer.BorderSizePixel = 0
+tabContainer.Parent = mainFrame
+
+local tabButtons = {}
+local tabFrames = {}
+local tabs = {"Player", "Visual", "Teleport", "Combat", "Misc", "View"}
+local tabIcons = {"P", "V", "T", "C", "M", "E"}
+
+local contentFrame = Instance.new("ScrollingFrame")
+contentFrame.Size = UDim2.new(1, -10, 1, -85)
+contentFrame.Position = UDim2.new(0, 5, 0, 80)
+contentFrame.BackgroundTransparency = 1
+contentFrame.BorderSizePixel = 0
+contentFrame.ScrollBarThickness = 4
+contentFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 0, 255)
+contentFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+contentFrame.Parent = mainFrame
+
+for i, tabName in ipairs(tabs) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 60, 0, 30)
+    btn.Position = UDim2.new(0, (i-1)*62 + 5, 0, 2)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 27, 50)
+    btn.BorderSizePixel = 0
+    btn.Text = tabIcons[i]
+    btn.TextColor3 = Color3.fromRGB(150, 130, 200)
+    btn.TextScaled = true
+    btn.Font = Enum.Font.GothamBold
+    btn.Parent = tabContainer
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 6)
+    btnCorner.Parent = btn
+    
+    local frame = Instance.new("ScrollingFrame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundTransparency = 1
+    frame.BorderSizePixel = 0
+    frame.ScrollBarThickness = 3
+    frame.ScrollBarImageColor3 = Color3.fromRGB(100, 0, 255)
+    frame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    frame.Visible = (i == 1)
+    frame.Parent = contentFrame
+    
+    tabButtons[i] = btn
+    tabFrames[i] = frame
+    
+    btn.MouseButton1Click:Connect(function()
+        for j = 1, #tabs do
+            tabFrames[j].Visible = (j == i)
+            tabButtons[j].BackgroundColor3 = (j == i) and Color3.fromRGB(100, 0, 255) or Color3.fromRGB(30, 27, 50)
+            tabButtons[j].TextColor3 = (j == i) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 130, 200)
         end
     end)
+end
+
+-- ============================================================
+-- FUNÇÕES AUXILIARES PARA CRIAR CONTROLES
+-- ============================================================
+local function criarToggle(parent, nome, desc, callback)
+    local yOffset = #parent:GetChildren() * 42
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -10, 0, 36)
+    frame.Position = UDim2.new(0, 5, 0, yOffset + 5)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 23, 42)
+    frame.BorderSizePixel = 0
+    frame.Parent = parent
+    
+    local fCorner = Instance.new("UICorner")
+    fCorner.CornerRadius = UDim.new(0, 6)
+    fCorner.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -55, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = nome
+    label.TextColor3 = Color3.fromRGB(220, 220, 240)
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamSemibold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    
+    local toggleBtnUI = Instance.new("ImageButton")
+    toggleBtnUI.Size = UDim2.new(0, 40, 0, 22)
+    toggleBtnUI.Position = UDim2.new(1, -48, 0.5, -11)
+    toggleBtnUI.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    toggleBtnUI.BorderSizePixel = 0
+    toggleBtnUI.Parent = frame
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 11)
+    toggleCorner.Parent = toggleBtnUI
+    
+    local toggleCircle = Instance.new("Frame")
+    toggleCircle.Size = UDim2.new(0, 18, 0, 18)
+    toggleCircle.Position = UDim2.new(0, 2, 0.5, -9)
+    toggleCircle.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+    toggleCircle.BorderSizePixel = 0
+    toggleCircle.Parent = toggleBtnUI
+    
+    local circleCorner = Instance.new("UICorner")
+    circleCorner.CornerRadius = UDim.new(0, 9)
+    circleCorner.Parent = toggleCircle
+    
+    local active = false
+    
+    local function atualizarToggle()
+        active = not active
+        toggleBtnUI.BackgroundColor3 = active and Color3.fromRGB(100, 0, 255) or Color3.fromRGB(60, 60, 80)
+        toggleCircle.Position = active and UDim2.new(0, 20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+        toggleCircle.BackgroundColor3 = active and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+        pcall(callback, active)
+    end
+    
+    toggleBtnUI.MouseButton1Click:Connect(atualizarToggle)
+    
+    -- Atualizar canvas size
+    parent.CanvasSize = UDim2.new(0, 0, 0, (#parent:GetChildren()) * 42 + 10)
+    
+    return { set = function(state)
+        if state ~= active then
+            atualizarToggle()
+        end
+    end, get = function() return active end }
+end
+
+local function criarBotao(parent, nome, desc, callback)
+    local yOffset = #parent:GetChildren() * 42
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -10, 0, 36)
+    frame.Position = UDim2.new(0, 5, 0, yOffset + 5)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 23, 42)
+    frame.BorderSizePixel = 0
+    frame.Parent = parent
+    
+    local fCorner = Instance.new("UICorner")
+    fCorner.CornerRadius = UDim.new(0, 6)
+    fCorner.Parent = frame
+    
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 1, -6)
+    btn.Position = UDim2.new(0, 5, 0, 3)
+    btn.BackgroundColor3 = Color3.fromRGB(100, 0, 255)
+    btn.BorderSizePixel = 0
+    btn.Text = nome
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 13
+    btn.Font = Enum.Font.GothamSemibold
+    btn.Parent = frame
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 6)
+    btnCorner.Parent = btn
+    
+    btn.MouseButton1Click:Connect(callback)
+    
+    parent.CanvasSize = UDim2.new(0, 0, 0, (#parent:GetChildren()) * 42 + 10)
+end
+
+-- ============================================================
+-- PREENCHER ABAS COM FUNÇÕES
+-- ============================================================
+
+-- ========== ABA PLAYER ==========
+local playerFrame = tabFrames[1]
+
+criarToggle(playerFrame, "WalkSpeed", "Velocidade 50", function(state)
+    flags.walkspeed = state
 end)
 
--- Fly (Voar)
-PlayerSection:NewToggle("Fly (Voar)", "Habilita modo de voo", function(state)
-    local fly = state
-    local player = game.Players.LocalPlayer
-    local char = player.Character
-    local hum = char.Humanoid
-    local root = char.HumanoidRootPart
+criarToggle(playerFrame, "JumpPower", "Pulo 100", function(state)
+    flags.jumppower = state
+end)
 
-    if fly then
+criarToggle(playerFrame, "Noclip", "Atravessar paredes", function(state)
+    flags.noclip = state
+end)
+
+criarToggle(playerFrame, "Fly (Voar)", "WASD+Espaço+Shift", function(state)
+    flags.fly = state
+end)
+
+criarToggle(playerFrame, "Invisivel", "Personagem transparente", function(state)
+    flags.invisivel = state
+end)
+
+-- ========== ABA VISUAL ==========
+local visualFrame = tabFrames[2]
+
+criarToggle(visualFrame, "ESP Players", "Destacar jogadores", function(state)
+    flags.espPlayers = state
+end)
+
+criarToggle(visualFrame, "ESP Itens", "Destacar itens", function(state)
+    flags.espItens = state
+end)
+
+criarToggle(visualFrame, "Fullbright", "Remover escuridão", function(state)
+    flags.fullbright = state
+end)
+
+criarToggle(visualFrame, "FOV Zoom", "Campo de visão 120", function(state)
+    flags.fovZoom = state
+end)
+
+-- ========== ABA TELEPORT ==========
+local teleportFrame = tabFrames[3]
+
+criarToggle(teleportFrame, "Click TP", "Clique pra teleportar", function(state)
+    flags.clickTP = state
+end)
+
+-- Teleport para jogador específico
+local function criarTeleportPlayerList()
+    local yOffset = #teleportFrame:GetChildren() * 42
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -10, 0, 24)
+    label.Position = UDim2.new(0, 5, 0, yOffset + 5)
+    label.BackgroundTransparency = 1
+    label.Text = "─ Teleport para Jogador ─"
+    label.TextColor3 = Color3.fromRGB(100, 0, 255)
+    label.TextSize = 13
+    label.Font = Enum.Font.GothamBold
+    label.Parent = teleportFrame
+    
+    yOffset = yOffset + 32
+    
+    for _, plr in pairs(players:GetPlayers()) do
+        if plr ~= player then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 30)
+            btn.Position = UDim2.new(0, 5, 0, yOffset)
+            btn.BackgroundColor3 = Color3.fromRGB(35, 32, 55)
+            btn.BorderSizePixel = 0
+            btn.Text = "📌 " .. plr.Name
+            btn.TextColor3 = Color3.fromRGB(200, 200, 255)
+            btn.TextSize = 13
+            btn.Font = Enum.Font.GothamSemibold
+            btn.Parent = teleportFrame
+            
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(0, 6)
+            btnCorner.Parent = btn
+            
+            btn.MouseButton1Click:Connect(function()
+                if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    player.Character.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame * CFrame.new(0, 3, 0)
+                    game:GetService("StarterGui"):SetCore("SendNotification", {
+                        Title = "PHANTOM HUB",
+                        Text = "Teleportado para " .. plr.Name,
+                        Duration = 2
+                    })
+                end
+            end)
+            
+            yOffset = yOffset + 35
+        end
+    end
+    
+    teleportFrame.CanvasSize = UDim2.new(0, 0, 0, yOffset + 10)
+end
+
+criarTeleportPlayerList()
+
+-- ========== ABA COMBAT ==========
+local combatFrame = tabFrames[4]
+
+criarToggle(combatFrame, "Aimbot", "Mira automática", function(state)
+    flags.aimbot = state
+end)
+
+criarToggle(combatFrame, "Auto Click", "Clique automático", function(state)
+    flags.autoClick = state
+end)
+
+-- ========== ABA MISC ==========
+local miscFrame = tabFrames[5]
+
+criarToggle(miscFrame, "Anti-AFK", "Evitar desconexão", function(state)
+    flags.antiafk = state
+end)
+
+criarBotao(miscFrame, "Rejoin Server", "Reconectar ao mesmo servidor", function()
+    game:GetService("TeleportService"):Teleport(game.PlaceId, player)
+end)
+
+criarBotao(miscFrame, "Server Hop", "Pular de servidor", function()
+    local function hop()
+        local success, result = pcall(function()
+            return game:GetService("HttpService"):JSONDecode(
+                game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?limit=100")
+            )
+        end)
+        if success then
+            for _, server in pairs(result.data) do
+                if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, server.id, player)
+                    return
+                end
+            end
+        end
+    end
+    hop()
+end)
+
+-- ========== ABA VIEW (Espectar) ==========
+local viewFrame = tabFrames[6]
+
+local function criarViewPlayerList()
+    local yOffset = 5
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -10, 0, 24)
+    label.Position = UDim2.new(0, 5, 0, yOffset)
+    label.BackgroundTransparency = 1
+    label.Text = "─ Clique para Espectar ─"
+    label.TextColor3 = Color3.fromRGB(100, 0, 255)
+    label.TextSize = 13
+    label.Font = Enum.Font.GothamBold
+    label.Parent = viewFrame
+    
+    yOffset = yOffset + 32
+    
+    for _, plr in pairs(players:GetPlayers()) do
+        if plr ~= player then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 30)
+            btn.Position = UDim2.new(0, 5, 0, yOffset)
+            btn.BackgroundColor3 = Color3.fromRGB(35, 32, 55)
+            btn.BorderSizePixel = 0
+            btn.Text = "👁 " .. plr.Name
+            btn.TextColor3 = Color3.fromRGB(200, 200, 255)
+            btn.TextSize = 13
+            btn.Font = Enum.Font.GothamSemibold
+            btn.Parent = viewFrame
+            
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(0, 6)
+            btnCorner.Parent = btn
+            
+            btn.MouseButton1Click:Connect(function()
+                if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    flags.viewPlayer = true
+                    camera.CameraSubject = plr.Character.Humanoid
+                    camera.CameraType = Enum.CameraType.Custom
+                    
+                    game:GetService("StarterGui"):SetCore("SendNotification", {
+                        Title = "PHANTOM HUB",
+                        Text = "Espectando: " .. plr.Name,
+                        Duration = 3
+                    })
+                end
+            end)
+            
+            yOffset = yOffset + 35
+        end
+    end
+    
+    -- Botão para parar de espectar
+    local stopBtn = Instance.new("TextButton")
+    stopBtn.Size = UDim2.new(1, -10, 0, 30)
+    stopBtn.Position = UDim2.new(0, 5, 0, yOffset)
+    stopBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
+    stopBtn.BorderSizePixel = 0
+    stopBtn.Text = "✕ Parar de Espectar"
+    stopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    stopBtn.TextSize = 13
+    stopBtn.Font = Enum.Font.GothamSemibold
+    stopBtn.Parent = viewFrame
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 6)
+    btnCorner.Parent = stopBtn
+    
+    stopBtn.MouseButton1Click:Connect(function()
+        flags.viewPlayer = false
+        camera.CameraSubject = player.Character.Humanoid
+        camera.CameraType = Enum.CameraType.Custom
+    end)
+    
+    yOffset = yOffset + 40
+    
+    viewFrame.CanvasSize = UDim2.new(0, 0, 0, yOffset + 10)
+end
+
+criarViewPlayerList()
+
+-- ============================================================
+-- SISTEMA DE ABRIR/FECHAR COM ANIMAÇÃO
+-- ============================================================
+local menuAberto = false
+
+local function animarMenu(abrir)
+    menuAberto = abrir
+    mainFrame.Visible = true
+    
+    local goal = {}
+    local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    
+    if abrir then
+        mainFrame.BackgroundTransparency = 0.05
+        mainFrame.Size = UDim2.new(0, 380, 0, 500)
+        mainFrame.Position = UDim2.new(0.5, -190, 0.5, -250)
+        
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 255)
+        toggleBtn.Size = UDim2.new(0, 50, 0, 50)
+    else
+        mainFrame.BackgroundTransparency = 1
+        mainFrame.Size = UDim2.new(0, 0, 0, 0)
+        mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+        
+        wait(0.3)
+        mainFrame.Visible = false
+        
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+        toggleBtn.Size = UDim2.new(0, 50, 0, 50)
+    end
+end
+
+toggleBtn.MouseButton1Click:Connect(function()
+    if menuAberto then
+        animarMenu(false)
+    else
+        animarMenu(true)
+    end
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
+    animarMenu(false)
+end)
+
+-- Keybind: RightShift para abrir/fechar
+userInput.InputBegan:Connect(function(input, gameProcessed)
+    if input.KeyCode == Enum.KeyCode.RightShift and not gameProcessed then
+        if menuAberto then
+            animarMenu(false)
+        else
+            animarMenu(true)
+        end
+    end
+end)
+
+-- Mostrar notificação
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "PHANTOM HUB v2.0",
+    Text = "Clique no ícone [P] ou pressione RightShift",
+    Duration = 5
+})
+
+-- ============================================================
+-- LOOP PRINCIPAL (todas as funções rodam aqui)
+-- ============================================================
+runService.RenderStepped:Connect(function()
+    local char = player.Character
+    if not char then return end
+    
+    local hum = char:FindFirstChild("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not hum or not root then return end
+    
+    -- WalkSpeed
+    if flags.walkspeed then
+        hum.WalkSpeed = 50
+    elseif hum.WalkSpeed ~= 16 then
+        hum.WalkSpeed = 16
+    end
+    
+    -- JumpPower
+    if flags.jumppower then
+        hum.JumpPower = 100
+    elseif hum.JumpPower ~= 50 then
+        hum.JumpPower = 50
+    end
+    
+    -- Noclip
+    if flags.noclip then
+        hum:ChangeState(11)
+    end
+    
+    -- Fly
+    if flags.fly then
         hum.PlatformStand = true
-        local bv = Instance.new("BodyVelocity")
-        bv.Velocity = Vector3.new(0, 0, 0)
-        bv.MaxForce = Vector3.new(10000, 10000, 10000)
-        bv.Parent = root
+        local bv = root:FindFirstChild("PhantomBodyVelocity")
+        local bg = root:FindFirstChild("PhantomBodyGyro")
+        
+        if not bv then
+            bv = Instance.new("BodyVelocity")
+            bv.Name = "PhantomBodyVelocity"
+            bv.MaxForce = Vector3.new(10000, 10000, 10000)
+            bv.Parent = root
+        end
+        if not bg then
+            bg = Instance.new("BodyGyro")
+            bg.Name = "PhantomBodyGyro"
+            bg.MaxTorque = Vector3.new(10000, 10000, 10000)
+            bg.Parent = root
+        end
+        
+        local moveDir = Vector3.new()
+        if userInput:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camera.CFrame.LookVector end
+        if userInput:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camera.CFrame.LookVector end
+        if userInput:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camera.CFrame.RightVector end
+        if userInput:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camera.CFrame.RightVector end
+        if userInput:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
+        if userInput:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+        
+        if moveDir.Magnitude > 0 then
+            moveDir = moveDir.Unit * flySpeed
+        else
+            moveDir = Vector3.new(0, 0, 0)
+        end
+        
+        bv.Velocity = moveDir
+        bg.CFrame = CFrame.new(root.Position, root.Position + camera.CFrame.LookVector)
+    else
+        hum.PlatformStand = false
+        local bv = root:FindFirstChild("PhantomBodyVelocity")
+        local bg = root:FindFirstChild("PhantomBodyGyro")
+        if bv then bv:Destroy() end
+        if bg then bg:Destroy() end
+    end
+    
+    -- Invisivel
+    if flags.invisivel then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Transparency = 1
+            end
+        end
+    end
+    
+    -- ESP Players
+    if flags.espPlayers then
+        for _, plr in pairs(players:GetPlayers()) do
+            if plr ~= player and plr.Character then
+                local hl = plr.Character:FindFirstChild("PHANTOM_ESP")
+                if not hl then
+                    local h = Instance.new("Highlight")
+                    h.Name = "PHANTOM_ESP"
+                    h.FillColor = Color3.fromRGB(255, 50, 50)
+                    h.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    h.FillTransparency = 0.5
+                    h.Adornee = plr.Character
+                    h.Parent = plr.Character
+                end
+            end
+        end
+    else
+        for _, h in pairs(workspace:GetDescendants()) do
+            if h.Name == "PHANTOM_ESP" then
+                h:Destroy()
+            end
+        end
+    end
+    
+    -- ESP Itens
+    if flags.espItens then
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and obj.Parent and obj.Parent:FindFirstChild("TouchInterest") then
+                if not obj:FindFirstChild("PHANTOM_ITEM_ESP") then
+                    local h = Instance.new("Highlight")
+                    h.Name = "PHANTOM_ITEM_ESP"
+                    h.FillColor = Color3.fromRGB(50, 255, 50)
+                    h.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    h.FillTransparency = 0.3
+                    h.Adornee = obj
+                    h.Parent = obj
+                end
+            end
+        end
+    else
+        for _, h in pairs(workspace:GetDescendants()) do
+            if h.Name == "PHANTOM_ITEM_ESP" then
+                h:Destroy()
+            end
+        end
+    end
+    
+    -- Fullbright
+    if flags.fullbright then
+        game:GetService("Lighting").Brightness = 2
+        game:GetService("Lighting").Ambient = Color3.new(1, 1, 1)
+        game:GetService("Lighting").OutdoorAmbient = Color3.new(1, 1, 1)
+    else
+        game:GetService("Lighting").Brightness = 1
+        game:GetService("Lighting").Ambient = Color3.new(0, 0, 0)
+        game:GetService("Lighting").OutdoorAmbient = Color3.new(0.5, 0.5, 0.5)
+    end
+    
+    -- FOV Zoom
+    if flags.fovZoom then
+        camera.FieldOfView = 120
+    else
+        camera.FieldOfView = 70
+    end
+    
+    -- Aimbot
+    if flags.aimbot then
+        local closest, closestDist = nil, math.huge
+        for _, target in pairs(players:GetPlayers()) do
+            if target ~= player and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                local dist = (target.Character.HumanoidRootPart.Position - root.Position).Magnitude
+                if dist < closestDist then
+                    closest = target
+                    closestDist = dist
+                end
+            end
+        end
+        if closest then
+            camera.CFrame = CFrame.new(camera.CFrame.Position, closest.Character.HumanoidRootPart.Position)
+        end
+    end
+    
+    -- Click TP
+    if flags.clickTP then
+        mouse.Button1Down:Connect(function()
+            local hit = mouse.Hit
+            if hit then
+                root.CFrame = CFrame.new(hit.X, hit.Y + 3, hit.Z)
+            end
+        end)
+    end
+end)
+
+-- Auto Click loop separado
+spawn(function()
+    while wait(0.1) do
+        if flags.autoClick then
+            mouse1click()
+        end
+    end
+end)
+
+-- Anti-AFK
+spawn(function()
+    while wait(60) do
+        if flags.antiafk then
+            local vu = game:GetService("VirtualUser")
+            vu:Button2Down(Vector2.new(0, 0), camera.CFrame)
+            wait(1)
+            vu:Button2Up(Vector2.new(0, 0), camera.CFrame)
+        end
+    end
+end)        bv.Parent = root
 
         local bg = Instance.new("BodyGyro")
         bg.MaxTorque = Vector3.new(10000, 10000, 10000)
