@@ -1,0 +1,351 @@
+--[[
+╔══════════════════════════════════════════════════════════════╗
+║                      PHANTOM HUB v1.0                        ║
+║              Painel de Script Completo para Roblox            ║
+║                     Uso Educacional / Testes                  ║
+╚══════════════════════════════════════════════════════════════╝
+--]]
+
+-- Carregar biblioteca de UI (suporta Synapse, Krnl, Script-Ware, etc.)
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+
+-- Janela principal
+local Window = Library.CreateLib("PHANTOM HUB | Roblox", "DarkTheme")
+
+-- ============================================================
+-- ABA: PLAYER (Jogador)
+-- ============================================================
+local PlayerTab = Window:NewTab("Player")
+local PlayerSection = PlayerTab:NewSection("Controles do Jogador")
+
+-- WalkSpeed
+PlayerSection:NewToggle("WalkSpeed", "Aumenta a velocidade de movimento", function(state)
+    if state then
+        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = 50
+    else
+        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = 16
+    end
+end)
+
+-- JumpPower
+PlayerSection:NewToggle("JumpPower", "Aumenta a altura do pulo", function(state)
+    if state then
+        game.Players.LocalPlayer.Character.Humanoid.JumpPower = 100
+    else
+        game.Players.LocalPlayer.Character.Humanoid.JumpPower = 50
+    end
+end)
+
+-- Noclip (Atravessar paredes)
+PlayerSection:NewToggle("Noclip", "Atravessa paredes e objetos", function(state)
+    local noclip = state
+    game:GetService("RunService").Stepped:Connect(function()
+        if noclip then
+            game.Players.LocalPlayer.Character.Humanoid:ChangeState(11)
+        end
+    end)
+end)
+
+-- Fly (Voar)
+PlayerSection:NewToggle("Fly (Voar)", "Habilita modo de voo", function(state)
+    local fly = state
+    local player = game.Players.LocalPlayer
+    local char = player.Character
+    local hum = char.Humanoid
+    local root = char.HumanoidRootPart
+
+    if fly then
+        hum.PlatformStand = true
+        local bv = Instance.new("BodyVelocity")
+        bv.Velocity = Vector3.new(0, 0, 0)
+        bv.MaxForce = Vector3.new(10000, 10000, 10000)
+        bv.Parent = root
+
+        local bg = Instance.new("BodyGyro")
+        bg.MaxTorque = Vector3.new(10000, 10000, 10000)
+        bg.Parent = root
+
+        local flySpeed = 50
+        local cam = workspace.CurrentCamera
+
+        game:GetService("RunService").RenderStepped:Connect(function()
+            if fly and root and root.Parent then
+                local moveDir = Vector3.new()
+                if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.W) then
+                    moveDir = moveDir + cam.CFrame.LookVector
+                end
+                if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.S) then
+                    moveDir = moveDir - cam.CFrame.LookVector
+                end
+                if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.A) then
+                    moveDir = moveDir - cam.CFrame.RightVector
+                end
+                if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.D) then
+                    moveDir = moveDir + cam.CFrame.RightVector
+                end
+                if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Space) then
+                    moveDir = moveDir + Vector3.new(0, 1, 0)
+                end
+                if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.LeftShift) then
+                    moveDir = moveDir - Vector3.new(0, 1, 0)
+                end
+                bv.Velocity = moveDir * flySpeed
+                bg.CFrame = CFrame.new(root.Position, root.Position + cam.CFrame.LookVector)
+            end
+        end)
+    else
+        hum.PlatformStand = false
+        if root:FindFirstChildOfClass("BodyVelocity") then
+            root:FindFirstChildOfClass("BodyVelocity"):Destroy()
+        end
+        if root:FindFirstChildOfClass("BodyGyro") then
+            root:FindFirstChildOfClass("BodyGyro"):Destroy()
+        end
+    end
+end)
+
+-- Invisivel
+PlayerSection:NewToggle("Invisivel", "Torna o personagem invisível", function(state)
+    for _, part in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Transparency = state and 1 or 0
+        end
+    end
+end)
+
+-- ============================================================
+-- ABA: ESP (Visual)
+-- ============================================================
+local ESPTab = Window:NewTab("ESP")
+local ESPSection = ESPTab:NewSection("Visual ESP")
+
+local espEnabled = false
+local espConnections = {}
+
+ESPSection:NewToggle("ESP Players", "Destaca jogadores através de paredes", function(state)
+    espEnabled = state
+    if state then
+        for _, player in pairs(game.Players:GetPlayers()) do
+            if player ~= game.Players.LocalPlayer then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "PHANTOM_ESP"
+                highlight.FillColor = Color3.fromRGB(255, 50, 50)
+                highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                highlight.FillTransparency = 0.5
+                highlight.Adornee = player.Character
+                highlight.Parent = player.Character
+            end
+        end
+        -- Conectar para novos jogadores
+        local conn = game.Players.PlayerAdded:Connect(function(player)
+            player.CharacterAdded:Connect(function(char)
+                if espEnabled then
+                    local h = Instance.new("Highlight")
+                    h.Name = "PHANTOM_ESP"
+                    h.FillColor = Color3.fromRGB(255, 50, 50)
+                    h.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    h.FillTransparency = 0.5
+                    h.Adornee = char
+                    h.Parent = char
+                end
+            end)
+        end)
+        table.insert(espConnections, conn)
+    else
+        for _, v in pairs(espConnections) do
+            v:Disconnect()
+        end
+        espConnections = {}
+        for _, highlight in pairs(workspace:GetDescendants()) do
+            if highlight.Name == "PHANTOM_ESP" then
+                highlight:Destroy()
+            end
+        end
+    end
+end)
+
+ESPSection:NewToggle("ESP Itens (Coletáveis)", "Destaca itens no chão", function(state)
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Parent and obj.Parent:FindFirstChild("TouchInterest") then
+            local highlight = obj:FindFirstChild("PHANTOM_ITEM_ESP")
+            if state then
+                if not highlight then
+                    local h = Instance.new("Highlight")
+                    h.Name = "PHANTOM_ITEM_ESP"
+                    h.FillColor = Color3.fromRGB(50, 255, 50)
+                    h.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    h.FillTransparency = 0.3
+                    h.Adornee = obj
+                    h.Parent = obj
+                end
+            else
+                if highlight then
+                    highlight:Destroy()
+                end
+            end
+        end
+    end
+end)
+
+-- ============================================================
+-- ABA: TELEPORT
+-- ============================================================
+local TeleportTab = Window:NewTab("Teleport")
+local TeleportSection = TeleportTab:NewSection("Teleport & Speed")
+
+TeleportSection:NewToggle("Click TP (Clique para Teleportar)", "Clique em qualquer lugar para teleportar", function(state)
+    local clickTP = state
+    local player = game.Players.LocalPlayer
+    local mouse = player:GetMouse()
+
+    if clickTP then
+        mouse.Button1Down:Connect(function()
+            local target = mouse.Hit
+            if target then
+                player.Character.HumanoidRootPart.CFrame = CFrame.new(target.X, target.Y + 3, target.Z)
+            end
+        end)
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "PHANTOM HUB",
+            Text = "Click TP ativado! Clique no chão para teleportar.",
+            Duration = 3
+        })
+    else
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "PHANTOM HUB",
+            Text = "Click TP desativado!",
+            Duration = 2
+        })
+    end
+end)
+
+-- ============================================================
+-- ABA: AIMBOT / COMBAT
+-- ============================================================
+local CombatTab = Window:NewTab("Combat")
+local CombatSection = CombatTab:NewSection("Aimbot & Auto Farm")
+
+CombatSection:NewToggle("Aimbot (Mira Automática)", "Mira automaticamente no jogador mais próximo", function(state)
+    local aimbot = state
+    local player = game.Players.LocalPlayer
+    local mouse = player:GetMouse()
+
+    game:GetService("RunService").RenderStepped:Connect(function()
+        if aimbot then
+            local closest, closestDist = nil, math.huge
+            for _, target in pairs(game.Players:GetPlayers()) do
+                if target ~= player and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = (target.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                    if dist < closestDist then
+                        closest = target
+                        closestDist = dist
+                    end
+                end
+            end
+            if closest then
+                workspace.CurrentCamera.CFrame = CFrame.new(
+                    workspace.CurrentCamera.CFrame.Position,
+                    closest.Character.HumanoidRootPart.Position
+                )
+            end
+        end
+    end)
+end)
+
+CombatSection:NewToggle("Auto Click (Clique Automático)", "Atira/clica automaticamente", function(state)
+    local autoClick = state
+    local player = game.Players.LocalPlayer
+    local mouse = player:GetMouse()
+
+    spawn(function()
+        while autoClick and wait(0.1) do
+            mouse1click()
+        end
+    end)
+end)
+
+-- ============================================================
+-- ABA: MISC (Diversos)
+-- ============================================================
+local MiscTab = Window:NewTab("Misc")
+local MiscSection = MiscTab:NewSection("Utilitários")
+
+MiscSection:NewToggle("Anti-AFK", "Previne desconexão por inatividade", function(state)
+    local antiAFK = state
+    local vu = game:GetService("VirtualUser")
+    game:GetService("Players").LocalPlayer.Idled:Connect(function()
+        if antiAFK then
+            vu:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+            wait(1)
+            vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+        end
+    end)
+end)
+
+MiscSection:NewToggle("Fullbright (Visão Total)", "Remove a escuridão do jogo", function(state)
+    if state then
+        game:GetService("Lighting").Brightness = 2
+        game:GetService("Lighting").Ambient = Color3.new(1, 1, 1)
+        game:GetService("Lighting").OutdoorAmbient = Color3.new(1, 1, 1)
+    else
+        game:GetService("Lighting").Brightness = 1
+        game:GetService("Lighting").Ambient = Color3.new(0, 0, 0)
+        game:GetService("Lighting").OutdoorAmbient = Color3.new(0.5, 0.5, 0.5)
+    end
+end)
+
+MiscSection:NewToggle("FOV Zoom", "Aumenta o campo de visão da câmera", function(state)
+    if state then
+        workspace.CurrentCamera.FieldOfView = 120
+    else
+        workspace.CurrentCamera.FieldOfView = 70
+    end
+end)
+
+MiscSection:NewButton("Rejoin Server", "Reconecta ao mesmo servidor", function()
+    local ts = game:GetService("TeleportService")
+    local placeId = game.PlaceId
+    ts:Teleport(placeId, game.Players.LocalPlayer)
+end)
+
+MiscSection:NewButton("Server Hop", "Pula para outro servidor", function()
+    local ts = game:GetService("TeleportService")
+    local placeId = game.PlaceId
+    local currentPlayer = game.Players.LocalPlayer
+
+    -- Tenta um servidor diferente
+    local function hop()
+        local http = game:GetService("HttpService")
+        local success, result = pcall(function()
+            return http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?limit=100"))
+        end)
+        if success then
+            for _, server in pairs(result.data) do
+                if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                    ts:TeleportToPlaceInstance(placeId, server.id, currentPlayer)
+                    return
+                end
+            end
+        end
+    end
+    hop()
+end)
+
+-- ============================================================
+-- ABA: INFO (Sobre)
+-- ============================================================
+local InfoTab = Window:NewTab("Info")
+local InfoSection = InfoTab:NewSection("Phantom Hub")
+
+InfoSection:NewLabel("PHANTOM HUB v1.0")
+InfoSection:NewLabel("Painel completo para testes")
+InfoSection:NewLabel("Feito para fins educacionais")
+InfoSection:NewLabel("Use com responsabilidade")
+InfoSection:NewLabel("Jogador: " .. game.Players.LocalPlayer.Name)
+
+-- Notificação de carregamento
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "PHANTOM HUB",
+    Text = "Painel carregado com sucesso!",
+    Duration = 5
+})
